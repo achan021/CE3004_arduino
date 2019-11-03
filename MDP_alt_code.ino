@@ -1,16 +1,3 @@
-  //Ways to improve hardware performance:
-//1) increase accuracy of IR sensors by increasing the sampling size
-//2) Change the stabilise time to adjust the 10cm movement of the robot
-//3) Full brakes for right and left turn (implement slow stop if needed)
-
-//things left to do
-//1) PID values tuning
-//2) Tuning to the maze board (move_start, move_stop, turn_left, turn_right, move_hold)
-//3) calibration code
-//4) instruction from RPI code (Serial communication)
-//5) tune PID
-//6) calibration need to use double and mini threshold. integer reading causes rounding error and slight tilt
-
 #include "DualVNH5019MotorShield.h"
 #include "Encoder.h"
 #include "PinChangeInt.h"
@@ -20,7 +7,7 @@
 
 DualVNH5019MotorShield md;
 
-//*****Pin allocation
+//*****PIN ALLOCATION ON ARDUINO UNO
 //Sharp IR sensor
 #define PS1 A0
 #define PS2 A1
@@ -33,16 +20,17 @@ DualVNH5019MotorShield md;
 #define e2b 13
 #define e1a 3
 #define e1b 5
-
+//Direction for motor speed setting
 #define right 1
 #define left -1
-
+//Counter for ticks (pulses) of individual motors
 volatile int counterA = 0;
 volatile int counterB = 0;
 double prevTick = counterA;
 volatile double counterC = 0;
 double difference;
 double Setpoint = 0, Input, Output;
+//PID tuning using ziegler method 1
 //PID set for exploration && image recognition
 double Ku = 3.3 , Tu = 0.45;
 double Kp = 0.6*Ku, Ki = 1.2*Ku/Tu, Kd = 3*Ku*Tu/40;
@@ -52,8 +40,9 @@ PID mPID(&Input,&Output,&Setpoint,Kp,Ki,Kd,DIRECT);
 double Kuf = 3.4, Tuf = 0.39;
 double Kpf = 0.6*Kuf, Kif = 1.2*Kuf/Tuf, Kdf = 3*Kuf*Tuf/40;
 PID mfPID(&Input,&Output,&Setpoint,Kpf,Kif,Kdf,DIRECT);
+//speed offset for master wheel (manual tuning)
 double quick = 25;
-//20
+
 
 double sensor1,sensor2,sensor3,sensor4,sensor5,sensor6;
 int move_step;
@@ -67,11 +56,13 @@ void setup() {
   pinMode(PS4,INPUT);
   pinMode(PS5,INPUT);
   pinMode(PS6,INPUT);
-
+  
+  //PCintPort will rewire the interrupt pins automatically. Note, arduino only got specific pins fit for interrupt.
   //Interrupt the arduino to update the encoder counters at the falling edge of the encoder reading
   PCintPort::attachInterrupt(e1a,outputAInc,RISING);
   PCintPort::attachInterrupt(e2a,outputBInc,RISING);
   md.init();
+  //Default serial connection is 1 sec. Drop it lower to make robot move faster
   Serial.setTimeout(60);
 }
 
@@ -88,8 +79,8 @@ void loop() {
    //Current voltage 6.218
    //6.157
    //First check : turning left and right
-   /*
-   //Left turn check
+   
+   //Turning test
    turnLeft(90);
    delay(2000);
    turnLeft(90);
@@ -469,6 +460,12 @@ double getSensorDistance(int sensorNumber){
 //***********************CALIBRATION CODE******************//
 
 //*************************SENSORS**************************//
+
+//To get a more accurate sensor reading, acquire the median reading among the samples. 
+//Sort prior using mergesort (nlogn)
+//Sensor linearization technique used here. Search for technique online.
+//Rmb to change the best fit equation in the subsequent code for every sensor.
+//Extra tips : rmb to change the best fit equation d.p. if using excel. Truncation on excel graph is set by default.
 
 //Get the Va2d value 
 double sensorSelector(int sensorNumber){
