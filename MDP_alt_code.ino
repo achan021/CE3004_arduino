@@ -1,3 +1,16 @@
+  //Ways to improve hardware performance:
+//1) increase accuracy of IR sensors by increasing the sampling size
+//2) Change the stabilise time to adjust the 10cm movement of the robot
+//3) Full brakes for right and left turn (implement slow stop if needed)
+
+//things left to do
+//1) PID values tuning
+//2) Tuning to the maze board (move_start, move_stop, turn_left, turn_right, move_hold)
+//3) calibration code
+//4) instruction from RPI code (Serial communication)
+//5) tune PID
+//6) calibration need to use double and mini threshold. integer reading causes rounding error and slight tilt
+
 #include "DualVNH5019MotorShield.h"
 #include "Encoder.h"
 #include "PinChangeInt.h"
@@ -7,7 +20,7 @@
 
 DualVNH5019MotorShield md;
 
-//*****PIN ALLOCATION ON ARDUINO UNO
+//*****Pin allocation
 //Sharp IR sensor
 #define PS1 A0
 #define PS2 A1
@@ -20,17 +33,16 @@ DualVNH5019MotorShield md;
 #define e2b 13
 #define e1a 3
 #define e1b 5
-//Direction for motor speed setting
+
 #define right 1
 #define left -1
-//Counter for ticks (pulses) of individual motors
+
 volatile int counterA = 0;
 volatile int counterB = 0;
 double prevTick = counterA;
 volatile double counterC = 0;
 double difference;
 double Setpoint = 0, Input, Output;
-//PID tuning using ziegler method 1
 //PID set for exploration && image recognition
 double Ku = 3.3 , Tu = 0.45;
 double Kp = 0.6*Ku, Ki = 1.2*Ku/Tu, Kd = 3*Ku*Tu/40;
@@ -40,9 +52,8 @@ PID mPID(&Input,&Output,&Setpoint,Kp,Ki,Kd,DIRECT);
 double Kuf = 3.4, Tuf = 0.39;
 double Kpf = 0.6*Kuf, Kif = 1.2*Kuf/Tuf, Kdf = 3*Kuf*Tuf/40;
 PID mfPID(&Input,&Output,&Setpoint,Kpf,Kif,Kdf,DIRECT);
-//speed offset for master wheel (manual tuning)
 double quick = 25;
-
+//20
 
 double sensor1,sensor2,sensor3,sensor4,sensor5,sensor6;
 int move_step;
@@ -56,13 +67,11 @@ void setup() {
   pinMode(PS4,INPUT);
   pinMode(PS5,INPUT);
   pinMode(PS6,INPUT);
-  
-  //PCintPort will rewire the interrupt pins automatically. Note, arduino only got specific pins fit for interrupt.
+
   //Interrupt the arduino to update the encoder counters at the falling edge of the encoder reading
   PCintPort::attachInterrupt(e1a,outputAInc,RISING);
   PCintPort::attachInterrupt(e2a,outputBInc,RISING);
   md.init();
-  //Default serial connection is 1 sec. Drop it lower to make robot move faster
   Serial.setTimeout(60);
 }
 
@@ -72,15 +81,15 @@ char readChar;
 bool complete = false;
 char* command;
 void loop() {
-  
+   
    /*---------------------------------------------------------------------------------------------------
                                  Cordless calibration (comment main code)
   ---------------------------------------------------------------------------------------------------*/
    //Current voltage 6.218
    //6.157
    //First check : turning left and right
-   
-   //Turning test
+   /*
+   //Left turn check
    turnLeft(90);
    delay(2000);
    turnLeft(90);
@@ -196,7 +205,6 @@ void loop() {
 //      D ---> Rotate Right
 //      B ---> Break
 //      S ---> Read Sensor Values
-//      R ---> Resend reply string 
 //      F ---> full calibration
 //      Q ---> Quick calibration (no side dist check)
      
@@ -281,16 +289,7 @@ void loop() {
     command = strtok(NULL,",");
     
     }
-  
-  
-
-  
   }
-  
-  
-  
-  
-
 }
 
   
@@ -298,25 +297,6 @@ void loop() {
 
 bool stringRx;
 String stringMsg;
- 
-
-void readInstruction(String stringMsg){
-  //string instruction first then value
-  //switch statement to catch instruction. 
-  /*
-  'm,1' move 1 step
-  'm,10' move 10 step
-  'tr,' turn right
-  'tl,' turn left
-  'cal,' calibrate
-  'ta,(angle)' turn at an angle
-  'rx,1' - 'rx,6' receive distance from sensor 1 - 6
-  */
-
-
-}
-
-
 
 
 //*************************mergeSorting algorithm*******************//
@@ -389,65 +369,7 @@ void mergeSort(double arr[], int l, int r)
         merge(arr, l, m, r); 
     } 
 } 
-/*
-void mergesort(double sample_array[], int start_index, int stop_index){
-  int mid = (stop_index + start_index) / 2;
-  if (stop_index - start_index <= 0){
-    return;  
-  } else if (stop_index - start_index > 1){
-    mergesort(sample_array,start_index, mid);
-    mergesort(sample_array,mid+1,stop_index);
-  }
-  merge(sample_array,start_index,stop_index);
-}
 
-void merge(double sample_array[], int start_index, int stop_index){
-    for (int i = 0 ; i < 13; i ++){
-    Serial.print(sample_array[i]); 
-    Serial.print(","); 
-    Serial.println();
-     }
-    if (stop_index - start_index <= 0){
-      return; 
-    }
-    int first_p, second_p,list_p,mid,tmp;
-    mid = (start_index + stop_index)/2;
-    while(first_p <= mid && second_p <= stop_index){
-      int cmp = compare(sample_array[first_p],sample_array[second_p]);
-      //compare(a,b) cmp >0 == a > b, cmp<0 == a<b, cmp ==0 a==b
-      if (cmp>0){
-        tmp = sample_array[second_p++];
-        for (int i = ++mid; i > first_p; i --){
-          sample_array[i] = sample_array[i-1];
-        }
-        sample_array[first_p++] = tmp;
-      }else if (cmp <0){
-        first_p++;  
-      }else{
-        if (first_p == mid && second_p == stop_index){
-          break; 
-        }  
-        tmp = sample_array[second_p++];
-        first_p++;
-        for (int i = ++mid; i >first_p; i--){
-          sample_array[i] = sample_array[i-1];
-        }
-        sample_array[first_p++] = tmp; 
-      }
-    }
-}
-
-int compare(double first_ele, double second_ele ){
-  if ( first_ele > second_ele){
-    return 1;
-  }else if (first_ele < second_ele){
-    return -1;
-  }else{
-    return 0;
-  }
-}
-*/
-//*********************************************************//
 
 //********************Getter functions*********************//
 
@@ -461,31 +383,12 @@ double getSensorDistance(int sensorNumber){
 
 //*************************SENSORS**************************//
 
-//To get a more accurate sensor reading, acquire the median reading among the samples. 
-//Sort prior using mergesort (nlogn)
-//Sensor linearization technique used here. Search for technique online.
-//Rmb to change the best fit equation in the subsequent code for every sensor.
-//Extra tips : rmb to change the best fit equation d.p. if using excel. Truncation on excel graph is set by default.
-
 //Get the Va2d value 
 double sensorSelector(int sensorNumber){
   int Va2d;
   double actualDist;
   int samples = 100;
   double sample_array[samples];
-  /*PS1 : front(facing) left(position)
-   * 1/(0.0002*Va2d-0.0035)
-   *PS2 : left (facing) right back (position)
-   * 1/(0.0000461264287194777*Va2d + 0.00350075454754003)- 13
-   *PS3 : front (facing) center (position)
-   * 1/(0.000217544*Va2d-0.007048529)
-   *PS4 : front (facing) right (position)
-   * 1/(0.000169263687*Va2d+0.00159521)- 2.7
-   *PS5 : right (facing) left (position)
-   * 1/(0.0000472581180546883*Va2d + 0.00308166146592542)- 15
-   *PS6 : left (facing) right front (position)
-   * 1/(0.000205548368703085*Va2d - 0.00379803442590226)
-   */
    
   switch(sensorNumber){
     case 1:
@@ -574,6 +477,7 @@ void outputBInc(void){
   counterB++;
 }
 
+//return the rounded reading of sensors. 10 cm -> 1 , 20cm -> 2 and 30cm -> 3 and else -> -1. This means that we limit out robot's range to only 30cm.
 int returnRounded(double distance){
   if (distance < 10 && distance >= 0){
     return 1;  
@@ -595,11 +499,7 @@ void sensorSense(bool movement){
     //50 samples take about 54 millis to read (must be less than sampling time of 100)
     //distance from the boundary of the robot
     //distance from the boundary to the next step
-      /*
-      sensor2 = ((getSensorDistance(2) - 11.5 )/10) ;
-      sensor3 = ((getSensorDistance(3) - 5.9)/10) ;
-      sensor4 = ((getSensorDistance(4) - 4.8 )/10);
-//      */
+     
 //      sensor1 = getSensorDistance(1)-5.3;
 //      sensor5 = getSensorDistance(5)-4.3;
 //      sensor2 = getSensorDistance(2)-5.6;
@@ -615,39 +515,16 @@ void sensorSense(bool movement){
       sensor6 = returnRounded(getSensorDistance(6)-11);
 
       
-      //distance "(S1)(S2)(S3)(S4)(S5)(S6)"
+      //distance "(S1)(S2)(S3)(S4)(S5)(S6)" concatenated and send to the RPI then to algo, Algo will split by "," to get the readings of each sensor.
       String sensorVal = String(sensor1)+","+String(sensor2)+","+String(sensor3)+","+String(sensor4)+","+String(sensor5)+","+String(sensor6);
       int len = sensorVal.length();
       char char_array[len+1];
       sensorVal.toCharArray(char_array,len);
       Serial.println(char_array);
-      /*
-      Serial.println("Sensor1 :");
-      Serial.println(sensor1);
-      Serial.println("Sensor2 :");
-      Serial.println(sensor2);
-      Serial.println("Sensor3 :");
-      Serial.println(sensor3);
-      Serial.println("Sensor4 :");
-      Serial.println(sensor4);
-      Serial.println("Sensor5 :");
-      Serial.println(sensor5);
-      Serial.println("Sensor6 :");
-      Serial.println(sensor6);
-      */
-      
-    
-    /*
-    sensor1 = getSensorDistance(1) - 1.7 - b2Bound;
-    sensor2 = getSensorDistance(2) - 11.5 - b2Bound;
-    sensor3 = getSensorDistance(3) - 5.9 - b2Bound;
-    sensor4 = getSensorDistance(4) - 4.8 - b2Bound;
-    sensor5 = getSensorDistance(5) - 4.7 - b2Bound;
-    sensor6 = getSensorDistance(6) - 5.2 - b2Bound;
-    */
 
     
     /*
+     *         (Back)
      *          ---x x x (s1)
      *          ||| 
      * (s6)x x x---x x x (s5)
@@ -655,21 +532,8 @@ void sensorSense(bool movement){
      *       x   x   x
      *       x   x   x
      *      (s4)(s3)(s2)
-     */
-     //IR RECEIVER CANNOT BE AT BOTTOM
-     //Serial.print("sensor1: ");
-     //Serial.println(sensor1);
-     //Serial.print("sensor2: ");
-     //Serial.println(sensor2);
-     //Serial.print("sensor3: ");
-     //Serial.println(sensor3);
-     //Serial.print("sensor4: ");
-     //Serial.println(sensor4);
-     //Serial.print("sensor5: ");
-     //Serial.println(sensor5);
-     //Serial.print("sensor6: ");
-     //Serial.println(sensor6);
-     
+     *        (Front)
+     */     
 }
 
 
@@ -679,9 +543,11 @@ void move_hold(int steps){
     int tempDetect[steps][2];
     int count = 0;
     int pid;
-    //chg to RPM
+    //All these are in RPM values
     int forwardClimb = 110;
+    //initial ramp RPM
     int interS1 = 90;
+    //stopping ramp RPM
     int interE1 = 70;
     counterA = 0;
     counterB = 0;
@@ -690,12 +556,14 @@ void move_hold(int steps){
     mPID.SetMode(AUTOMATIC);
     mPID.SetSampleTime(100);
     mPID.SetOutputLimits(-400,400);
-    
+    //number of ticks per step
     int target_tick = 280;
+    //There is a linear offset error based on the number of steps. (Measured during the checklist phase)
     double offset_error = 0.05*(steps*10)-0.5;
     int offset = (562.25/(6*PI))*offset_error;
     int loopCount = counterC;
-    int pridelayTicks = 15, secdelayTicks = 30;
+    //Amount of ticks for initial ramp and stopping ramp -> secdelayTicks
+    int secdelayTicks = 30;
     
     // + offset
     while (counterC < (target_tick * steps + offset - 14)){
@@ -704,33 +572,25 @@ void move_hold(int steps){
       while(delayE - delayS < 5000){
         delayE = micros();
       }
+      //input of PID is the difference between the 2 tick count of the motors.
       Input = counterA - counterB;
       bool compute = mPID.Compute();
+      //quick is the manual offset to lower the speed of the motor1. Motor1 is ultimately faster therefore, causing robot to right drift.
+      //initial ramp
       if (counterC < secdelayTicks && compute)
         md.setSpeeds(right*spd_motor1(interS1)+Output-quick,left*(spd_motor2(interS1)-Output));//270
+      //stopping ramp
       else if (counterC >=secdelayTicks && counterC <= (target_tick * steps) - secdelayTicks && compute )
         md.setSpeeds(right*spd_motor1(forwardClimb)+Output-quick,left*(spd_motor2(forwardClimb)-Output));//270
       else if ( counterC > (target_tick * steps) - secdelayTicks && compute)
         md.setSpeeds(right*spd_motor1(interE1)+Output-quick,left*(spd_motor2(interE1)-Output));//270
-      /*
-      if (counterC < secdelayTicks && compute)
-        md.setSpeeds(right*spd_motor1(interS1)+Output,left*(spd_motor2(interS1)-Output));//270
-      else if (counterC >=secdelayTicks && counterC <= (target_tick * steps) - secdelayTicks && compute )
-        md.setSpeeds(right*spd_motor1(forwardClimb)+Output,left*(spd_motor2(forwardClimb)-Output));//270
-      else if (counterC >=secdelayTicks && counterC <= (target_tick * steps) - pridelayTicks && compute )
-        md.setSpeeds(right*spd_motor1(interE2)+Output,left*(spd_motor2(interE2)-Output));
-      else if ( counterC > (target_tick * steps) - pridelayTicks && compute)
-        md.setSpeeds(right*spd_motor1(interE1)+Output,left*(spd_motor2(interE1)-Output));//270
-      */
-      
-      
     }
-    
+    //reset counterC for next movement
     counterC = 0;
     md.setBrakes(400,400);
 }
 
-
+//Old code used for checklist clearing.
 void move_hold_checklist(int stopPoint){
 
     int pid;
@@ -746,8 +606,6 @@ void move_hold_checklist(int stopPoint){
     mPID.SetSampleTime(100);
     mPID.SetOutputLimits(-400,400);
 
-    
-
     while (getSensorDistance(3) > stopPoint){
       
       Input = counterA - counterB;
@@ -762,7 +620,8 @@ void move_hold_checklist(int stopPoint){
     counterC = 0;
     md.setBrakes(400,400);
 }
-  
+
+//old code used for testing. Not implemented for actual robot movement.
 void reverse_move_hold(double steps){
 
     int pid;
@@ -808,9 +667,10 @@ void turnLeft(double angle){
     mPID.SetMode(AUTOMATIC);
     mPID.SetSampleTime(100);
     mPID.SetOutputLimits(-400,400);
+    //number of ticks required to turn the robot 90 degrees left. -13 is the manual tuning offset based on actual run days 
     int turnTicks = (int)(((562.25 * 17/6)/360) * (angle))-13;
-    //-5
     //+ 0.0278*angle this was initial offset for turning more than 90 degrees, for checklist
+    //This delay is employed to try and mitigate the 45 degrees error occasionally done by the robot (Possibly hardware problem)
     double delayS = micros(), delayE = micros();
       while(delayE - delayS < 5000){
         delayE = micros();
@@ -841,9 +701,10 @@ void turnRight(double angle){
     mPID.SetMode(AUTOMATIC);
     mPID.SetSampleTime(100);
     mPID.SetOutputLimits(-400,400);
-    //
+    //number of ticks required to turn the robot 90 degrees right. -16 is the manual tuning offset based on actual run days 
     int turnTicks = (int)(((562.25 * 17/6)/360) * (angle))-16;
     //last try is 17
+    //This delay is employed to try and mitigate the 45 degrees error occasionally done by the robot (Possibly hardware problem)
     double delayS = micros(), delayE = micros();
       while(delayE - delayS < 5000){
         delayE = micros();
@@ -870,6 +731,7 @@ void move_hold_fast(int steps){
     int count = 0;
     int pid;
     //chg to RPM
+    //test is the speed reduction on the motor 1 to reduce right drift (same as quick in normal movement)
     int test = 25;
     int forwardClimb = 140;
     int inter = 100;
@@ -907,7 +769,7 @@ void move_hold_fast(int steps){
     md.setBrakes(400,400);
 }
 
-
+//fast turn left is not employed bcse it introduces new tuning issues. Therefore, we make the turn slow but forward movement fast instead.
 void turnLeft_fast(double angle){
     int forwardClimb = 140;
     double inter = 100,inter2 = 40;
@@ -934,7 +796,7 @@ void turnLeft_fast(double angle){
     md.setBrakes(400 ,400);
     counterC = 0;
 }
-
+//fast turn right is not employed bcse it introduces new tuning issues. Therefore, we make the turn slow but forward movement fast instead.
 void turnRight_fast(double angle){
     
     int forwardClimb = 140;
@@ -966,6 +828,7 @@ void turnRight_fast(double angle){
 }
 
 /****************     Calibration code   **********************/
+//robot will creep forward
 void move_hold_noRamp(){
 
     //chg to RPM
@@ -993,6 +856,7 @@ void move_hold_noRamp(){
     md.setBrakes(400,400);
 }
 
+//robot will creep backwards
 void reverse_move_hold_noRamp(){
 
     int pid;
@@ -1017,7 +881,7 @@ void reverse_move_hold_noRamp(){
     counterC = 0;
     md.setBrakes(400,400);
 }
-
+//robot will creep left to correct right tilt
 void turnLeft_noRamp(double angle){
     int forwardClimb = 200;
     counterA = 0;
@@ -1039,6 +903,7 @@ void turnLeft_noRamp(double angle){
     counterC = 0;
 }
 
+//robot will creep right to correct left tilt
 void turnRight_noRamp(double angle){
     int forwardClimb = 200;
     counterA = 0;
@@ -1073,40 +938,8 @@ void full_calibration(){
   
 }
 
-//Front back callibration (no tilt)
-//void FB_calibration(){
-//  bool distCheck = false;
-//  int distInput = 0, samples = 5;
-//  double tthreshold = 0.2;
-//  while(distCheck == false){
-//        double distTotal = 0;
-//        for (int i = 0; i < samples; i++){
-//          distTotal += getSensorDistance(3) -7;
-//        }
-//        distInput = distTotal / samples;
-//        //Serial.println(distInput);
-//        if (distInput > 5 + tthreshold){
-//          move_hold_noRamp();
-//        }  
-//        //move back
-//        else if (distInput < 5 - tthreshold){
-//          reverse_move_hold_noRamp();
-//        }
-//        else if (distInput >= 5 - tthreshold && distInput <= 5 + tthreshold){
-//          delay(50);
-//          distCheck = true;
-//        }
-//        //delay(200);
-//    }
-//  
-//}
-//sensor1 = getSensorDistance(1)-5.3;
-//sensor5 = getSensorDistance(5)-4.3;
-//sensor2 = getSensorDistance(2)-5.6;
-//sensor3 = getSensorDistance(3)-7;
-//sensor4 = getSensorDistance(4)-5.3;
-//sensor6 = getSensorDistance(6)-11;
-//tilt and front back calibration
+//abit of inefficient coding here bcse of time constraint
+//calibration includes tilt check, distance check, then tilt check again.
 void calibration(){
     
     //chg to RPM
@@ -1191,14 +1024,15 @@ void calibration(){
     }
 }
 
-
+//Conversion obtained from plotting the RPM vs Speed graph on excel.
+//converts RPM to speed 
 double spd_motor1(double RPM){
   if (RPM == 0){
     return 0;
   }
   return((RPM + 6.66877416698447000000)/ 0.40957074863028700000 );
 }
-
+//converts RPM to speed
 double spd_motor2(double RPM){
   if (RPM == 0){
     return 0;
